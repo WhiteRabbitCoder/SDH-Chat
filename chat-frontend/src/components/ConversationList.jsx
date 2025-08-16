@@ -1,50 +1,43 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { useSocket } from '../context/SocketContext';
 
 // --- Subcomponente para cada elemento de la lista de conversaciones ---
-const ConversationItem = ({ conversation, isSelected, onSelect, currentUserId }) => {
+const ConversationItem = ({ conversation, isSelected, onSelect, currentUserId, onDeleteChat, onLeaveGroup }) => {
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef(null);
   const baseClasses = "p-3 hover:bg-gray-800 transition-colors cursor-pointer";
   const activeClasses = "bg-gray-800 border-l-4 border-primary-600";
 
   const formatTimestamp = (date) => {
     if (!date) return '';
-    
     const seconds = date._seconds ?? date.seconds;
     if (!seconds) {
-        // Si no hay 'seconds', podría ser un objeto Date de JS (del socket)
-        if (date instanceof Date) {
-            const now = new Date();
-            if (date.toDateString() === now.toDateString()) {
-                return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            }
-            return date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
+      if (date instanceof Date) {
+        const now = new Date();
+        if (date.toDateString() === now.toDateString()) {
+          return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         }
-        return '';
+        return date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
+      }
+      return '';
     }
-    
     const messageDate = new Date(seconds * 1000);
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
 
-    if (messageDate >= startOfToday) {
-      return messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
-    if (messageDate >= startOfYesterday) {
-      return 'Ayer';
-    }
+    if (messageDate >= startOfToday) return messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (messageDate >= startOfYesterday) return 'Ayer';
     return messageDate.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
   };
 
   const getDisplayName = () => {
     if (conversation.nombre && conversation.nombre !== 'Chat') return conversation.nombre;
     if (conversation.esGrupo) return 'Grupo';
-    
     if (conversation.participantes) {
       const participantesArray = Array.isArray(conversation.participantes) ? conversation.participantes : Object.values(conversation.participantes);
       const otherParticipant = participantesArray.find(p => (p.id || p.userId || p) !== currentUserId);
-      
       if (otherParticipant) {
         if (typeof otherParticipant === 'string') return `Usuario ${otherParticipant.substring(0, 6)}...`;
         if (otherParticipant.nombre && otherParticipant.departamento) return `${otherParticipant.nombre} - ${otherParticipant.departamento}`;
@@ -61,6 +54,38 @@ const ConversationItem = ({ conversation, isSelected, onSelect, currentUserId })
     return !conversation.esGrupo && otherParticipant?.estado === 'online';
   };
 
+  // Cerrar menú si se hace clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setShowMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [menuRef]);
+
+  const handleMenuClick = (e) => {
+    e.stopPropagation();
+    setShowMenu(prev => !prev);
+  };
+
+  const handleDelete = (e) => {
+    e.stopPropagation();
+    if (window.confirm('¿Seguro que quieres eliminar este chat? Esta acción no se puede deshacer.')) {
+      onDeleteChat(conversation.id);
+    }
+    setShowMenu(false);
+  };
+
+  const handleLeave = (e) => {
+    e.stopPropagation();
+    if (window.confirm('¿Seguro que quieres salir de este grupo?')) {
+      onLeaveGroup(conversation.id);
+    }
+    setShowMenu(false);
+  };
+
   return (
     <div className={`${baseClasses} ${isSelected ? activeClasses : ''}`} onClick={() => onSelect(conversation)}>
       <div className="flex items-center w-full">
@@ -72,21 +97,40 @@ const ConversationItem = ({ conversation, isSelected, onSelect, currentUserId })
           </div>
           <div className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-gray-900 ${isConversationOnline() ? 'bg-green-500' : 'bg-gray-500'}`}></div>
         </div>
-        {/* CORRECCIÓN: Se añade 'min-w-0' para evitar que el contenido se desborde */}
+
+        {/* Contenido */}
         <div className="ml-3 flex-1 min-w-0">
-          {/* Fila superior: Nombre y Hora */}
           <div className="flex justify-between items-center">
             <h4 className="font-medium truncate">{getDisplayName()}</h4>
             <span className="text-xs text-gray-500 ml-2 whitespace-nowrap">
               {formatTimestamp(conversation.fechaUltimoMensaje)}
             </span>
           </div>
-          {/* Fila inferior: Último mensaje */}
           <div className="flex items-center mt-1">
             <p className="text-sm text-gray-400 truncate">
               {conversation.ultimoMensaje || 'No hay mensajes...'}
             </p>
           </div>
+        </div>
+
+        {/* Menú de Opciones */}
+        <div className="relative ml-2" ref={menuRef}>
+          <button onClick={handleMenuClick} className="p-1 rounded-full hover:bg-gray-700">
+            <span className="material-symbols-outlined text-gray-400">more_horiz</span>
+          </button>
+          {showMenu && (
+            <div className="absolute right-0 top-full mt-1 w-48 bg-gray-700 rounded-md shadow-lg z-20">
+              {conversation.esGrupo ? (
+                <button onClick={handleLeave} className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-600">
+                  Salir del grupo
+                </button>
+              ) : (
+                <button onClick={handleDelete} className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-600">
+                  Eliminar chat
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -94,7 +138,7 @@ const ConversationItem = ({ conversation, isSelected, onSelect, currentUserId })
 };
 
 // --- Componente principal de la lista ---
-const ConversationList = ({ user, conversations, setConversations, onConversationSelect, selectedConversationId }) => {
+const ConversationList = ({ user, conversations, setConversations, onConversationSelect, selectedConversationId, onDeleteChat, onLeaveGroup }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { socket, isConnected } = useSocket();
@@ -106,7 +150,6 @@ const ConversationList = ({ user, conversations, setConversations, onConversatio
 
   useEffect(() => {
     if (!socket || !isConnected) return;
-
     const handleUserStatusChange = (data) => {
       setConversations(prev => prev.map(conv => {
         const participantIndex = conv.participantes?.findIndex(p => p.id === data.userId);
@@ -118,28 +161,23 @@ const ConversationList = ({ user, conversations, setConversations, onConversatio
         return conv;
       }));
     };
-
     const handleReceiveMessage = (data) => {
-        setConversations(prev => {
-            const convIndex = prev.findIndex(c => c.id === data.conversationId);
-            if (convIndex === -1) return prev;
-
-            const updatedConv = {
-                ...prev[convIndex],
-                ultimoMensaje: data.message.content,
-                fechaUltimoMensaje: new Date(data.message.timestamp), // Asegurarse que sea un objeto Date
-            };
-
-            const newConversations = [...prev];
-            newConversations.splice(convIndex, 1);
-            newConversations.unshift(updatedConv);
-            return newConversations;
-        });
+      setConversations(prev => {
+        const convIndex = prev.findIndex(c => c.id === data.conversationId);
+        if (convIndex === -1) return prev;
+        const updatedConv = {
+          ...prev[convIndex],
+          ultimoMensaje: data.message.content,
+          fechaUltimoMensaje: new Date(data.message.timestamp),
+        };
+        const newConversations = [...prev];
+        newConversations.splice(convIndex, 1);
+        newConversations.unshift(updatedConv);
+        return newConversations;
+      });
     };
-
     socket.on('user_status_change', handleUserStatusChange);
     socket.on('receive_message', handleReceiveMessage);
-    
     return () => {
       socket.off('user_status_change', handleUserStatusChange);
       socket.off('receive_message', handleReceiveMessage);
@@ -185,7 +223,14 @@ const ConversationList = ({ user, conversations, setConversations, onConversatio
                 Online ({onlineConversations.length})
               </div>
               {onlineConversations.map(conv => (
-                <ConversationItem key={`online-${conv.id}`} {...{conversation: conv, isSelected: conv.id === selectedConversationId, onSelect: onConversationSelect, currentUserId: user.id}} />
+                <ConversationItem key={`online-${conv.id}`} {...{
+                  conversation: conv,
+                  isSelected: conv.id === selectedConversationId,
+                  onSelect: onConversationSelect,
+                  currentUserId: user.id,
+                  onDeleteChat,
+                  onLeaveGroup
+                }} />
               ))}
             </div>
           )}
@@ -195,7 +240,14 @@ const ConversationList = ({ user, conversations, setConversations, onConversatio
                 Offline ({offlineConversations.length})
               </div>
               {offlineConversations.map(conv => (
-                <ConversationItem key={`offline-${conv.id}`} {...{conversation: conv, isSelected: conv.id === selectedConversationId, onSelect: onConversationSelect, currentUserId: user.id}} />
+                <ConversationItem key={`offline-${conv.id}`} {...{
+                  conversation: conv,
+                  isSelected: conv.id === selectedConversationId,
+                  onSelect: onConversationSelect,
+                  currentUserId: user.id,
+                  onDeleteChat,
+                  onLeaveGroup
+                }} />
               ))}
             </div>
           )}
@@ -206,7 +258,7 @@ const ConversationList = ({ user, conversations, setConversations, onConversatio
         </div>
       )}
     </div>
-    );
+  );
 };
 
 export default ConversationList;

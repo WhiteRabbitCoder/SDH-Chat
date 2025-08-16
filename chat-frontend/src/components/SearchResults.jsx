@@ -14,17 +14,17 @@ const SearchResults = ({ results, onStartConversation }) => {
       <div className="p-2 text-sm font-medium text-gray-500 border-b border-gray-800">
         Resultados de búsqueda ({results.length})
       </div>
-      
+
       {results.map(user => (
-        <div 
-          key={user.id} 
+        <div
+          key={user.id}
           className="p-3 hover:bg-gray-800 transition-colors cursor-pointer flex items-center"
           onClick={() => onStartConversation(user)}
         >
           <div className="h-12 w-12 rounded-full bg-gray-700 flex items-center justify-center overflow-hidden">
             <span className="material-symbols-outlined text-gray-400">person</span>
           </div>
-          <div className="ml-3">
+          <div className="ml-3 flex-1">
             <h4 className="font-medium">
               {user.nombre || user.nickname || 'Usuario sin nombre'}
               {user.departamento && (
@@ -33,11 +33,16 @@ const SearchResults = ({ results, onStartConversation }) => {
             </h4>
             <p className="text-sm text-gray-400">{user.correo}</p>
           </div>
-          <div className="ml-auto">
-            <button className="text-primary-500 hover:text-primary-400">
-              <span className="material-symbols-outlined">chat</span>
-            </button>
-          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation(); // Evita que el div padre también reciba el clic
+              onStartConversation(user);
+            }}
+            className="ml-auto text-primary-500 hover:text-primary-400 p-2 rounded-full"
+            title={`Iniciar chat con ${user.nickname || user.nombre}`}
+          >
+            <span className="material-symbols-outlined">chat</span>
+          </button>
         </div>
       ))}
     </div>

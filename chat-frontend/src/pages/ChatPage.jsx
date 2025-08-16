@@ -78,12 +78,12 @@ const ChatPage = ({ user, onLogout }) => {
       const conversation = conversations.find(c => c.id === data.conversationId);
       if (!conversation) return;
 
-      setConversations(prev => prev.map(conv => 
+      setConversations(prev => prev.map(conv =>
         conv.id === data.conversationId ? { ...conv, unreadCount: (conv.unreadCount || 0) + 1 } : conv
       ));
 
       const sender = conversation.participantes.find(p => p.id === data.message.from);
-      const senderName = sender?.nombre || sender?.nickname || 'Usuario';
+      const senderName = sender?.nickname || sender?.nombre || 'Usuario';
 
       const newNotification = {
         id: Date.now(),
@@ -100,16 +100,19 @@ const ChatPage = ({ user, onLogout }) => {
       playNotificationSound();
     };
 
-    // CORRECCIÓN: Lógica para evitar notificaciones de estado duplicadas
     const notifiedStatusChanges = new Set();
     const handleUserStatus = (data) => {
       const statusKey = `${data.userId}-${data.estado}`;
       if (notifiedStatusChanges.has(statusKey)) return;
 
+      if (notifiedStatusChanges.size > 100) {
+        notifiedStatusChanges.clear();
+      }
+
       const userInAnyConversation = conversations.find(c => !c.esGrupo && c.participantes.some(p => p.id === data.userId));
       if (userInAnyConversation) {
         const userProfile = userInAnyConversation.participantes.find(p => p.id === data.userId);
-        const userName = userProfile?.nombre || userProfile?.nickname || 'Usuario';
+        const userName = userProfile?.nickname || userProfile?.nombre || 'Usuario';
 
         const newNotification = {
           id: Date.now(),
@@ -152,7 +155,7 @@ const ChatPage = ({ user, onLogout }) => {
 
   useEffect(() => {
     if (selectedConversation) {
-      setConversations(prev => prev.map(conv => 
+      setConversations(prev => prev.map(conv =>
         conv.id === selectedConversation.id ? { ...conv, unreadCount: 0 } : conv
       ));
       if (socket && isConnected) {
@@ -213,10 +216,14 @@ const ChatPage = ({ user, onLogout }) => {
   };
 
   const playNotificationSound = () => {
-    const soundUrl = 'https://cdn.freesound.org/previews/504/504856_9961300-hq.mp3';
-    const audio = new Audio(soundUrl);
-    audio.volume = 0.4;
-    audio.play().catch(err => console.log('Error al reproducir sonido:', err));
+    try {
+      const soundUrl = 'https://cdn.freesound.org/previews/504/504856_9961300-hq.mp3';
+      const audio = new Audio(soundUrl);
+      audio.volume = 0.4;
+      audio.play().catch(err => console.log('Error al reproducir sonido:', err));
+    } catch (error) {
+      console.log('Error al crear audio:', error);
+    }
   };
 
   const markAllAsRead = () => {
@@ -224,7 +231,21 @@ const ChatPage = ({ user, onLogout }) => {
     setUnreadNotifications(0);
   };
 
-  // CORRECCIÓN: La notificación se elimina al hacer clic
+  const clearAllNotifications = () => {
+    const hasUnread = notifications.some(n => !n.read);
+
+    if (hasUnread && notifications.length > 5) {
+      const confirm = window.confirm(
+        `¿Estás seguro de eliminar todas las ${notifications.length} notificaciones? Esta acción no se puede deshacer.`
+      );
+      if (!confirm) return;
+    }
+
+    setNotifications([]);
+    setUnreadNotifications(0);
+    setTimeout(() => setShowNotifications(false), 500);
+  };
+
   const goToConversation = (conversationId, notificationId) => {
     const conversation = conversations.find(c => c.id === conversationId);
     if (conversation) {
@@ -256,6 +277,36 @@ const ChatPage = ({ user, onLogout }) => {
     } catch (error) {
       console.error("Error al iniciar la conversación:", error);
     }
+  };
+
+  const handleDeleteOrLeave = async (conversationId, isGroup) => {
+    const actionText = isGroup ? 'salir del grupo' : 'eliminar el chat';
+    if (!window.confirm(`¿Estás seguro de que quieres ${actionText}?`)) {
+      return;
+    }
+
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      await axios.delete(`${API_URL}/api/conversations/${conversationId}`, {
+        params: { userId: user.id }
+      });
+
+      setConversations(prev => prev.filter(c => c.id !== conversationId));
+      if (selectedConversation?.id === conversationId) {
+        setSelectedConversation(null);
+      }
+    } catch (error) {
+      console.error(`Error al ${actionText}:`, error);
+      alert(`No se pudo ${actionText}.`);
+    }
+  };
+
+  const handleDeleteChat = (conversationId) => {
+    handleDeleteOrLeave(conversationId, false);
+  };
+
+  const handleLeaveGroup = (conversationId) => {
+    handleDeleteOrLeave(conversationId, true);
   };
 
   const filteredConversations = activeFilter === 'unread'
@@ -295,10 +346,27 @@ const ChatPage = ({ user, onLogout }) => {
                 <div className="absolute right-0 top-full mt-2 w-80 bg-gray-800 rounded-lg shadow-xl z-50 overflow-hidden">
                   <div className="p-3 border-b border-gray-700 flex justify-between items-center">
                     <h3 className="font-medium">Notificaciones</h3>
-                    {unreadNotifications > 0 && (
-                      <button onClick={markAllAsRead} className="text-xs text-primary-400 hover:text-primary-300">
-                        Marcar todas como leídas
-                      </button>
+                    {notifications.length > 0 && (
+                      <div className="flex items-center gap-1">
+                        {unreadNotifications > 0 && (
+                          <button
+                            onClick={markAllAsRead}
+                            className="text-xs text-primary-400 hover:text-primary-300 px-2 py-1 rounded hover:bg-gray-700 transition-colors"
+                            title="Marcar todas como leídas"
+                          >
+                            <span className="material-symbols-outlined text-xs mr-1">done_all</span>
+                            Leídas
+                          </button>
+                        )}
+                        <button
+                          onClick={clearAllNotifications}
+                          className="text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-gray-700 transition-colors"
+                          title="Eliminar todas las notificaciones"
+                        >
+                          <span className="material-symbols-outlined text-xs mr-1">delete_sweep</span>
+                          Limpiar
+                        </button>
+                      </div>
                     )}
                   </div>
                   <div className="max-h-96 overflow-y-auto">
@@ -371,6 +439,8 @@ const ChatPage = ({ user, onLogout }) => {
               setConversations={setConversations}
               onConversationSelect={setSelectedConversation}
               selectedConversationId={selectedConversation?.id}
+              onDeleteChat={handleDeleteChat}
+              onLeaveGroup={handleLeaveGroup}
             />
           )}
         </div>
@@ -408,10 +478,10 @@ const ChatPage = ({ user, onLogout }) => {
             <div className="mb-4">
               <label className="block text-sm font-medium mb-1">Participantes seleccionados ({selectedUsers.length})</label>
               <div className="flex flex-wrap gap-2 mb-2">
-                {selectedUsers.map(user => (
-                  <div key={user.id} className="bg-primary-700 text-white px-2 py-1 rounded-full text-xs flex items-center">
-                    {user.nombre || user.nickname || user.correo}
-                    <button onClick={() => setSelectedUsers(prev => prev.filter(u => u.id !== user.id))} className="ml-1 text-white hover:text-red-300">
+                {selectedUsers.map(selectedUser => (
+                  <div key={selectedUser.id} className="bg-primary-700 text-white px-2 py-1 rounded-full text-xs flex items-center">
+                    {selectedUser.nickname || selectedUser.nombre || selectedUser.correo}
+                    <button onClick={() => setSelectedUsers(prev => prev.filter(u => u.id !== selectedUser.id))} className="ml-1 text-white hover:text-red-300">
                       <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>close</span>
                     </button>
                   </div>
@@ -441,7 +511,7 @@ const ChatPage = ({ user, onLogout }) => {
                           <span className="material-symbols-outlined text-sm">person</span>
                         </div>
                         <div>
-                          <p className="text-sm font-medium">{availableUser.nombre || availableUser.nickname}</p>
+                          <p className="text-sm font-medium">{availableUser.nickname || availableUser.nombre}</p>
                           <p className="text-xs text-gray-400">{availableUser.correo}</p>
                         </div>
                       </div>
