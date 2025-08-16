@@ -3,35 +3,64 @@ import { db } from '../config/firebase.js';
 
 const router = express.Router();
 
-// GET /api/users/search?q=...
+// Buscar usuarios por término de búsqueda
 router.get('/search', async (req, res) => {
-  const { q, currentUserId } = req.query;
-
-  if (!q) {
-    return res.status(400).json({ error: 'El parámetro de búsqueda "q" (correo) es requerido.' });
-  }
-
   try {
-    // Busca un usuario por su correo electrónico (coincidencia exacta)
-    const userQuery = await db.collection('usuarios').where('correo', '==', q).limit(1).get();
-
-    if (userQuery.empty) {
-      return res.json([]); // No se encontró ningún usuario con ese correo
-    }
-
-    const userDoc = userQuery.docs[0];
-
-    // Excluir al usuario actual de los resultados
-    if (userDoc.id === currentUserId) {
+    const { q, currentUserId } = req.query;
+    
+    if (!q || q.trim() === '') {
       return res.json([]);
     }
-
-    // Devolver el usuario encontrado en un array
-    res.json([{ id: userDoc.id, ...userDoc.data() }]);
-
+    
+    const usersSnapshot = await db.collection('usuarios').get();
+    const users = [];
+    
+    usersSnapshot.forEach(doc => {
+      const userData = { id: doc.id, ...doc.data() };
+      
+      // Excluir al usuario actual de los resultados
+      if (userData.id === currentUserId) {
+        return;
+      }
+      
+      // Buscar en correo, nombre, y nickname
+      const searchTerm = q.toLowerCase();
+      if (
+        (userData.correo && userData.correo.toLowerCase().includes(searchTerm)) ||
+        (userData.nombre && userData.nombre.toLowerCase().includes(searchTerm)) ||
+        (userData.nickname && userData.nickname.toLowerCase().includes(searchTerm)) ||
+        (userData.departamento && userData.departamento.toLowerCase().includes(searchTerm))
+      ) {
+        users.push(userData);
+      }
+    });
+    
+    res.json(users);
   } catch (error) {
-    console.error("Error al buscar usuario por correo:", error);
-    res.status(500).json({ error: 'Error interno del servidor.' });
+    console.error('Error al buscar usuarios:', error);
+    res.status(500).json({ message: 'Error al buscar usuarios' });
+  }
+});
+
+// Obtener todos los usuarios excepto el actual
+router.get('/', async (req, res) => {
+  try {
+    const { excludeId } = req.query;
+    
+    const usersSnapshot = await db.collection('usuarios').get();
+    const users = [];
+    
+    usersSnapshot.forEach(doc => {
+      const userData = { id: doc.id, ...doc.data() };
+      if (userData.id !== excludeId) {
+        users.push(userData);
+      }
+    });
+    
+    res.json(users);
+  } catch (error) {
+    console.error('Error al obtener usuarios:', error);
+    res.status(500).json({ message: 'Error al obtener usuarios' });
   }
 });
 

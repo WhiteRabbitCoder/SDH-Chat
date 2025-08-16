@@ -1,28 +1,44 @@
-const SearchResultItem = ({ user, onStartConversation }) => (
-  <div 
-    className="p-3 hover:bg-gray-800 transition-colors cursor-pointer flex items-center gap-3"
-    onClick={() => onStartConversation(user)}
-  >
-    <div className="h-10 w-10 rounded-full bg-gray-700 flex items-center justify-center">
-      <span className="material-symbols-outlined">person_add</span>
-    </div>
-    <div>
-      <h4 className="font-medium">{user.nickname}</h4>
-      <p className="text-sm text-gray-400">{user.correo}</p>
-    </div>
-  </div>
-);
+import React from 'react';
 
 const SearchResults = ({ results, onStartConversation }) => {
   if (results.length === 0) {
-    return <div className="p-4 text-center text-gray-500">No se encontraron usuarios con ese correo.</div>;
+    return (
+      <div className="p-4 text-center text-gray-500">
+        No se encontraron resultados.
+      </div>
+    );
   }
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <h3 className="p-3 text-xs font-bold uppercase text-gray-400">Resultados de la búsqueda</h3>
+      <div className="p-2 text-sm font-medium text-gray-500 border-b border-gray-800">
+        Resultados de búsqueda ({results.length})
+      </div>
+      
       {results.map(user => (
-        <SearchResultItem key={user.id} user={user} onStartConversation={onStartConversation} />
+        <div 
+          key={user.id} 
+          className="p-3 hover:bg-gray-800 transition-colors cursor-pointer flex items-center"
+          onClick={() => onStartConversation(user)}
+        >
+          <div className="h-12 w-12 rounded-full bg-gray-700 flex items-center justify-center overflow-hidden">
+            <span className="material-symbols-outlined text-gray-400">person</span>
+          </div>
+          <div className="ml-3">
+            <h4 className="font-medium">
+              {user.nombre || user.nickname || 'Usuario sin nombre'}
+              {user.departamento && (
+                <span className="text-gray-400 text-sm ml-1">- {user.departamento}</span>
+              )}
+            </h4>
+            <p className="text-sm text-gray-400">{user.correo}</p>
+          </div>
+          <div className="ml-auto">
+            <button className="text-primary-500 hover:text-primary-400">
+              <span className="material-symbols-outlined">chat</span>
+            </button>
+          </div>
+        </div>
       ))}
     </div>
   );

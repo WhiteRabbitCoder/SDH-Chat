@@ -26,7 +26,7 @@ function App() {
 
   // El id="webcrumbs" es crucial para que el nuevo tailwind.config.js funcione
   return (
-    <div id="webcrumbs">
+    <div className="h-screen w-screen">
       {user ? (
         <SocketProvider userId={user.id}>
           <ChatPage user={user} onLogout={handleLogout} />

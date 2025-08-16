@@ -6,7 +6,7 @@ import { useSocket } from '../context/SocketContext';
 const Message = ({ message, isSender }) => {
   const alignment = isSender ? 'self-end' : 'self-start';
   const colors = isSender ? 'bg-primary-800 rounded-br-none' : 'bg-gray-800 rounded-bl-none';
-  
+
   let timestamp;
   const seconds = message.fechaHora?._seconds ?? message.fechaHora?.seconds;
 
@@ -48,16 +48,61 @@ const ChatWindow = ({ conversation, user }) => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [newMessage, setNewMessage] = useState('');
-  
-  // <-- INICIO DE LA CORRECCIÓN -->
+
   // Usamos los estados directamente del contexto. ¡No más estados locales para la conexión!
   const { socket, isConnected, connectionError } = useSocket();
-  // <-- FIN DE LA CORRECCIÓN -->
 
   const messagesEndRef = useRef(null);
-  
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  // Función para obtener el nombre del interlocutor o el nombre del grupo
+  const getDisplayName = () => {
+    // Si es un grupo, mostrar el nombre del grupo
+    if (conversation.esGrupo) {
+      return conversation.nombre || 'Grupo';
+    }
+
+    // Para chat 1-a-1, buscar al otro participante
+    if (conversation.participantes) {
+      const otherParticipant = conversation.participantes.find(p => p.id !== user.id);
+
+      if (otherParticipant) {
+        // Si tiene nombre y departamento
+        if (otherParticipant.nombre && otherParticipant.departamento) {
+          return `${otherParticipant.nombre} - ${otherParticipant.departamento}`;
+        }
+
+        // Si solo tiene nombre
+        if (otherParticipant.nombre) {
+          return otherParticipant.nombre;
+        }
+
+        // Si tiene nickname (para compatibilidad)
+        if (otherParticipant.nickname) {
+          return otherParticipant.nickname;
+        }
+      }
+    }
+
+    // Fallback
+    return 'Chat';
+  };
+
+  // Función para verificar si el interlocutor está online
+  const isOtherParticipantOnline = () => {
+    if (!conversation.participantes) return false;
+
+    // Para chat 1-a-1
+    if (!conversation.esGrupo) {
+      const otherParticipant = conversation.participantes.find(p => p.id !== user.id);
+      return otherParticipant?.estado === 'online';
+    }
+
+    // Para grupos (opcional - puedes decidir qué lógica usar)
+    return conversation.participantes.some(p => p.id !== user.id && p.estado === 'online');
   };
 
   // Cargar mensajes iniciales
@@ -66,7 +111,8 @@ const ChatWindow = ({ conversation, user }) => {
     const fetchMessages = async () => {
       setLoading(true);
       try {
-        const response = await axios.get(`http://localhost:3000/api/conversations/${conversation.id}/messages`);
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        const response = await axios.get(`${API_URL}/api/conversations/${conversation.id}/messages`);
         setMessages(response.data);
       } catch (error) {
         console.error("Error al cargar los mensajes:", error);
@@ -91,7 +137,7 @@ const ChatWindow = ({ conversation, user }) => {
       if (data.conversationId === conversation.id) {
         setMessages(prevMessages => {
           const existingMsgIndex = prevMessages.findIndex(msg => msg.optimisticId && msg.optimisticId === data.message.optimisticId);
-          
+
           if (existingMsgIndex > -1) {
             const updatedMessages = [...prevMessages];
             updatedMessages[existingMsgIndex] = data.message;
@@ -156,15 +202,13 @@ const ChatWindow = ({ conversation, user }) => {
         <div className="flex items-center">
           <div className="h-10 w-10 rounded-full bg-gray-700 flex items-center justify-center overflow-hidden">
             <span className="material-symbols-outlined text-gray-400">
-              {isGroup ? 'group' : 'person'}
+              {conversation.esGrupo ? 'group' : 'person'}
             </span>
           </div>
           <div className="ml-3">
-            <h3 className="font-medium">{conversation.nombre || 'Chat'}</h3>
-            <p className="text-xs text-green-500">
-              {connectionError 
-                ? <span className="text-red-400">Error de conexión</span> 
-                : isConnected ? 'En línea' : 'Conectando...'}
+            <h3 className="font-medium">{getDisplayName()}</h3>
+            <p className={`text-xs ${isOtherParticipantOnline() ? 'text-green-500' : 'text-gray-400'}`}>
+              {isOtherParticipantOnline() ? 'En línea' : 'Desconectado'}
             </p>
           </div>
         </div>
@@ -207,8 +251,8 @@ const ChatWindow = ({ conversation, user }) => {
               className="w-full bg-gray-800 rounded-full py-2.5 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-200 disabled:opacity-50"
             />
           </div>
-          <button 
-            onClick={handleSendMessage} 
+          <button
+            onClick={handleSendMessage}
             disabled={!isConnected || !newMessage.trim()}
             className="h-10 w-10 rounded-full bg-primary-600 flex items-center justify-center hover:bg-primary-700 transition-colors flex-shrink-0 disabled:bg-gray-600 disabled:cursor-not-allowed"
           >
