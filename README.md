@@ -105,20 +105,6 @@ docker run -p 3000:3000 -d --name mi-chat-backend konecta-chat-backend
 
 ---
 
-## 👥 Usuarios de Prueba
-
-Para facilitar la evaluación de la aplicación, se han pre-cargado los siguientes usuarios en la base de datos de Firebase. Se recomienda abrir la aplicación en tres pestañas o navegadores distintos para simular una conversación en tiempo real.
-
-| Nickname          | Correo Electrónico    |  ID de Usuario     |
-| ----------------- | --------------------- | ------------------ |
-| Angelo            | `angelo@example.com`  |  `ANG-DES-0194K31` |
-| Carlos Rodriguez  | `carlos@example.com`  |  `CAR-VEN-00889YP` |
-| Marla             | `marla@example.com`   |  `MAR-SOP-0073XLN` |
-
-**Nota:** Los usuarios, no poseen contraseña. Como requisito de la prueba
-
----
-
 ## 🚧 Tareas Pendientes y Mejoras Futuras
 
 Aunque la funcionalidad principal está completa, el proyecto tiene potencial para crecer. Las siguientes son mejoras que se podrían implementar:
@@ -133,4 +119,6 @@ Aunque la funcionalidad principal está completa, el proyecto tiene potencial pa
 
 ## 🐞 Bugs Conocidos
 
-Actualmente, no se han identificado bugs críticos que impidan el funcionamiento de las características implementadas. La plataforma se encuentra en un estado
+Actualmente, no se han identificado bugs críticos que impidan el funcionamiento de las características implementadas. La plataforma se encuentra en un estado estable para demostración.
+
+---
