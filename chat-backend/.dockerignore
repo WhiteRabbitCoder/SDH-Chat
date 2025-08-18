@@ -1,0 +1,17 @@
+
+node_modules
+
+npm-debug.log
+
+
+.env
+serviceAccountKey.json
+
+
+Dockerfile
+.dockerignore
+.git
+.gitignore
+
+
+README.md
