@@ -14,7 +14,7 @@ const LoginPage = ({ onLogin }) => {
     setError('');
     try {
       // Asegúrate de que la URL coincida con tu backend
-      const response = await axios.post('http://localhost:3000/api/auth/login', { userId });
+      const response = await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/login`, { userId });
       onLogin(response.data.user);
     } catch (err) {
       setError(err.response?.data?.error || 'Error al iniciar sesión. Verifica el ID.');
